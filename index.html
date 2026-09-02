@@ -1,14 +1,68 @@
-<html>
+<!DOCTYPE html>
+<html lang="fr">
   <head>
-    <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
+    <meta charset="UTF-8">
+    <title>Scène 3D A-Frame</title>
+    <!-- Inclusion de la bibliothèque A-Frame -->
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
   </head>
   <body>
     <a-scene>
-      <a-box position="-1 0.5 -3" rotation="0 45 0" scale="2 2 2" color="#4CC3D9"></a-box>
-      <a-box position="0 1.25 -5" rotation="0 30 20" color="#EF2D5E"></a-box>
-      <a-box position="1 0.75 -3" rotation="20 15 3" color="#FFC65D"></a-box>
-      <a-plane position="0 0 0" rotation="-90 0 0" width="10" height="10" color="#7BC8A4"></a-plane>
+      <!-- Ciel d'arrière-plan -->
       <a-sky color="#ECECEC"></a-sky>
+
+      <!-- 
+        Surface de base (Plan) :
+        - Placée à y = 0
+        - Orientée horizontalement (rotation="-90 0 0")
+        - Dimensions : 12 x 12
+      -->
+      <a-plane 
+        position="0 0 0" 
+        rotation="-90 0 0" 
+        width="12" 
+        height="12" 
+        color="#7BC8A4">
+      </a-plane>
+
+      <!-- 
+        Trois boîtes de couleurs et positions différentes :
+        Le plan étant à y = 0, et chaque boîte ayant une hauteur de 1 unité (centre à y = 0.5),
+        positionner le centre à y = 2.5 fait léviter le bas de chaque boîte exactement à 2 unités au-dessus du plan.
+      -->
+      <!-- Boîte 1 : Rouge corail à gauche -->
+      <a-box 
+        position="-3 2.5 0" 
+        color="#E74C3C" 
+        depth="1" 
+        height="1" 
+        width="1">
+      </a-box>
+
+      <!-- Boîte 2 : Bleu vif au centre -->
+      <a-box 
+        position="0 2.5 0" 
+        color="#3498DB" 
+        depth="1" 
+        height="1" 
+        width="1">
+      </a-box>
+
+      <!-- Boîte 3 : Jaune soleil à droite -->
+      <a-box 
+        position="3 2.5 0" 
+        color="#F1C40F" 
+        depth="1" 
+        height="1" 
+        width="1">
+      </a-box>
+
+      <!-- 
+        Caméra :
+        - Hauteur y = 10
+        - Distance z = 15 (position="0 10 15")
+        - Orientée vers le bas vers le centre du plan (rotation="-30 0 0")
+      -->
       <a-entity 
         camera 
         look-controls 
@@ -16,6 +70,7 @@
         position="0 10 15" 
         rotation="-30 0 0">
       </a-entity>
+
     </a-scene>
   </body>
 </html>
