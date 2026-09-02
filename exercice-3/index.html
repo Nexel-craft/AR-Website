@@ -14,6 +14,7 @@
       margin: 0;
       overflow: hidden;
       font-family: Arial, sans-serif;
+      touch-action: none; /* Empeche les gestes de defilement mobile d'interferer avec les taps */
     }
     .top-controls {
       position: fixed;
@@ -25,6 +26,7 @@
       flex-wrap: wrap;
       gap: 6px;
       align-items: center;
+      touch-action: auto;
     }
     .panel {
       background: #ffffff;
@@ -48,43 +50,108 @@
       color: #0056b3;
       text-decoration: underline;
     }
+    #statusText {
+      font-weight: bold;
+      color: #0056b3;
+    }
   </style>
 
   <script>
-    AFRAME.registerComponent('interactive-box', {
-      init: function () {
-        const el = this.el;
-        const colors = ['#e74c3c', '#2ecc71', '#3498db', '#f1c40f', '#9b59b6'];
-        let colorIndex = 0;
-        let isFast = false;
-        const statusEl = document.getElementById('statusText');
-
-        el.addEventListener('click', function () {
-          colorIndex = (colorIndex + 1) % colors.length;
-          const nextColor = colors[colorIndex];
-          el.setAttribute('material', 'color', nextColor);
-
-          isFast = !isFast;
-          el.setAttribute('animation__spin', {
-            property: 'rotation',
-            to: '0 360 0',
-            loop: true,
-            dur: isFast ? 800 : 3500,
-            easing: 'linear'
-          });
-
-          el.setAttribute('animation__scale', {
-            property: 'scale',
-            to: isFast ? '1.3 1.3 1.3' : '1.0 1.0 1.0',
-            dur: 300,
-            easing: 'easeOutElastic'
-          });
-
-          if (statusEl) {
-            statusEl.textContent = `Vitesse : ${isFast ? 'Rapide' : 'Normale'} | Couleur : ${nextColor}`;
-          }
-        });
+    // Composant de rotation continue parametree en vitesse
+    AFRAME.registerComponent('dynamic-spin', {
+      schema: {
+        speed: { type: 'number', default: 1.2 }
+      },
+      tick: function (time, timeDelta) {
+        if (!this.el.object3D) return;
+        this.el.object3D.rotation.y += (timeDelta / 1000) * this.data.speed;
       }
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
+      const box = document.getElementById('targetBox');
+      const statusEl = document.getElementById('statusText');
+      const colors = ['#e74c3c', '#2ecc71', '#3498db', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c'];
+      
+      let colorIndex = 2; // Bleu par defaut
+      let isFast = false;
+      let lastTrigger = 0;
+
+      // Fonction principale declenchee au clic ou au tap sur le cube
+      function triggerBoxInteraction() {
+        const now = Date.now();
+        if (now - lastTrigger < 250) return; // Evite les doublons clic/tactile
+        lastTrigger = now;
+
+        // 1. Changement de couleur
+        colorIndex = (colorIndex + 1) % colors.length;
+        const nextColor = colors[colorIndex];
+        box.setAttribute('material', 'color', nextColor);
+
+        // 2. Changement de vitesse de rotation et d'echelle
+        isFast = !isFast;
+        const targetSpeed = isFast ? 5.0 : 1.2;
+        box.setAttribute('dynamic-spin', 'speed', targetSpeed);
+
+        box.setAttribute('animation__scale', {
+          property: 'scale',
+          to: isFast ? '1.5 1.5 1.5' : '1.0 1.0 1.0',
+          dur: 300,
+          easing: 'easeOutBack'
+        });
+
+        // 3. Vibration tactile sur mobile si supportee
+        if (navigator.vibrate) {
+          try { navigator.vibrate(50); } catch(e) {}
+        }
+
+        // 4. Mise a jour textuelle
+        if (statusEl) {
+          statusEl.textContent = `Touche ! Vitesse: ${isFast ? 'Rapide (5x)' : 'Normale (1x)'} | Couleur: ${nextColor}`;
+        }
+      }
+
+      // Ecouteur classique A-Frame click
+      box.addEventListener('click', triggerBoxInteraction);
+
+      // Raycaster direct Three.js pour garantir la detection tactile immediate sur mobile
+      const raycaster = new THREE.Raycaster();
+      const mouseVec = new THREE.Vector2();
+
+      function handlePointerCheck(clientX, clientY) {
+        const scene = document.querySelector('a-scene');
+        if (!scene || !scene.camera) return;
+        const canvas = scene.canvas;
+        if (!canvas) return;
+
+        const rect = canvas.getBoundingClientRect();
+        mouseVec.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+        mouseVec.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+        raycaster.setFromCamera(mouseVec, scene.camera);
+
+        if (!box.object3D) return;
+
+        // Verification de l'intersection avec la boite
+        const intersects = raycaster.intersectObjects([box.object3D], true);
+        if (intersects.length > 0) {
+          triggerBoxInteraction();
+        }
+      }
+
+      // Detection souris desktop
+      window.addEventListener('pointerdown', function (e) {
+        if (e.target.closest('.top-controls')) return;
+        handlePointerCheck(e.clientX, e.clientY);
+      });
+
+      // Detection tactile mobile (toucher du doigt sur l'ecran)
+      window.addEventListener('touchstart', function (e) {
+        if (e.target.closest('.top-controls')) return;
+        if (e.touches && e.touches[0]) {
+          handlePointerCheck(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      }, { passive: true });
     });
   </script>
 </head>
@@ -92,8 +159,8 @@
 
   <div class="top-controls">
     <div class="panel">
-      <strong>Exercice 3</strong> : Cliquer ou taper sur la boite. | 
-      <span id="statusText">Pret</span> | 
+      <strong>Exercice 3</strong> : Taper ou cliquer directement sur la boite. | 
+      <span id="statusText">En attente de touche sur le cube</span> | 
       <a href="../index.html">Sommaire</a>
     </div>
     <button id="btnSwitchCamera" class="btn" type="button">Changer de camera</button>
@@ -103,24 +170,22 @@
     <button id="btnFitMode" class="btn" type="button">Cadrage : Remplir</button>
   </div>
 
-  <a-scene embedded arjs="sourceType: webcam; sourceWidth: 1280; sourceHeight: 720; displayWidth: 1280; displayHeight: 720; debugUIEnabled: false;">
+  <a-scene embedded arjs="sourceType: webcam; sourceWidth: 1920; sourceHeight: 1080; debugUIEnabled: false;">
     <a-marker preset="hiro">
+      <!-- Boite interactive avec composant de rotation dynamique -->
       <a-box 
         id="targetBox"
         class="clickable"
         position="0 0.5 0" 
+        scale="1 1 1"
         color="#3498db" 
-        material="opacity: 0.8; transparent: true;"
-        animation__spin="property: rotation; to: 0 360 0; loop: true; dur: 3500; easing: linear"
-        interactive-box>
+        material="opacity: 0.85; transparent: true;"
+        dynamic-spin="speed: 1.2">
       </a-box>
     </a-marker>
 
-    <!-- Curseur reticule et raycaster tactile -->
-    <a-entity camera>
-      <a-cursor fuse="false" color="#00ffff" raycaster="objects: .clickable"></a-cursor>
-      <a-entity cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
-    </a-entity>
+    <!-- Curseur associe a la camera pour la souris et le tactile -->
+    <a-entity camera cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
   </a-scene>
 
 </body>
