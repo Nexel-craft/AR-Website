@@ -15,23 +15,23 @@
       padding: 0;
       overflow: hidden;
       font-family: Arial, sans-serif;
-      background: #000; /* Bandes noires propres sans rognage */
+      background: #000; /* Fond noir propre sans aucun rognage */
       user-select: none;
       -webkit-user-select: none;
     }
 
-    /* Force l'affichage du flux natif sans aucun rognage */
-    video#arjs-video, .a-canvas {
-      width: 100vw !important;
-      height: 100vh !important;
-      object-fit: contain !important;
-      margin: 0 !important;
-      top: 0 !important;
-      left: 0 !important;
+    /* Le cadrage contain sans rognage est pilote en temps reel par camera-switcher.js */
+    video#arjs-video {
       position: absolute !important;
+      z-index: 1 !important;
     }
 
-    /* Conteneur supérieur qui reste toujours 100% visible à l'écran */
+    .a-canvas {
+      position: absolute !important;
+      z-index: 2 !important; /* Devant la video pour garantir l'affichage du cube */
+    }
+
+    /* Conteneur superieur qui reste toujours 100% visible a l'ecran */
     .top-container {
       position: fixed;
       top: 8px;
@@ -91,7 +91,7 @@
       color: #0056b3;
     }
 
-    /* Figure affichant la zone de clic en noir à 20% de transparence */
+    /* Figure affichant la zone de clic en noir a 20% de transparence */
     #clickZoneBox {
       position: fixed;
       background-color: rgba(0, 0, 0, 0.2);
@@ -105,30 +105,14 @@
   </style>
 
   <script>
-    AFRAME.registerComponent('dynamic-spin', {
-      schema: {
-        speed: { type: 'number', default: 1.0 }
-      },
-      init: function () {
-        this.currentSpeed = this.data.speed;
-      },
-      update: function () {
-        this.currentSpeed = this.data.speed;
-      },
-      tick: function (time, timeDelta) {
-        if (!this.el.object3D) return;
-        this.el.object3D.rotation.y += (timeDelta / 1000) * this.currentSpeed;
-      }
-    });
-
     document.addEventListener('DOMContentLoaded', function () {
       const scene = document.querySelector('a-scene');
       const box = document.getElementById('targetBox');
       const statusEl = document.getElementById('statusText');
       const clickZone = document.getElementById('clickZoneBox');
-      const colors = ['#e74c3c', '#2ecc71', '#9b59b6', '#f1c40f', '#e67e22', '#00bcd4', '#e91e63'];
+      const colors = ['#e74c3c', '#2ecc71', '#3498db', '#f1c40f', '#9b59b6', '#e67e22', '#00bcd4'];
       
-      let colorIndex = 0;
+      let colorIndex = 2;
       let isFast = false;
       let lastTrigger = 0;
 
@@ -145,13 +129,17 @@
         target.setAttribute('material', 'color', nextColor);
 
         isFast = !isFast;
-        const newSpeed = isFast ? 6.0 : 1.0;
-        target.setAttribute('dynamic-spin', 'speed', newSpeed);
+        target.setAttribute('animation', {
+          property: 'rotation',
+          to: '0 360 0',
+          loop: true,
+          dur: isFast ? 800 : 4000,
+          easing: 'linear'
+        });
 
-        const targetScale = isFast ? '1.6 1.6 1.6' : '1.0 1.0 1.0';
         target.setAttribute('animation__scale', {
           property: 'scale',
-          to: targetScale,
+          to: isFast ? '1.5 1.5 1.5' : '1.0 1.0 1.0',
           dur: 300,
           easing: 'easeOutBack'
         });
@@ -161,7 +149,7 @@
         }
 
         if (statusEl) {
-          statusEl.textContent = `Touche ! Vitesse: ${isFast ? 'Rapide (6x)' : 'Normale (1x)'} | Couleur: ${nextColor}`;
+          statusEl.textContent = `Touche ! Vitesse: ${isFast ? 'Rapide' : 'Normale'} | Couleur: ${nextColor}`;
         }
       }
 
@@ -175,7 +163,7 @@
         box.addEventListener('click', triggerBoxInteraction);
       }
 
-      // Mise à jour de la zone de clic alignée sur le rectangle exact calculé par object-fit: contain
+      // Mise a jour continue de la hitbox alignee au pixel pres sur le viewport contain
       function updateClickZone() {
         requestAnimationFrame(updateClickZone);
         if (!scene || !scene.camera) return;
@@ -296,10 +284,9 @@
         id="targetBox"
         class="clickable"
         position="0 0.5 0" 
-        scale="1 1 1"
-        color="#e74c3c" 
+        color="#3498db" 
         material="opacity: 0.85; transparent: true;"
-        dynamic-spin="speed: 1.0">
+        animation="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear">
       </a-box>
     </a-marker>
 

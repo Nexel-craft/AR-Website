@@ -1,8 +1,9 @@
 /**
- * Gestionnaire de camera et de cadrage universel pour AR.js
- * - Maintien strict du flux natif sans aucun rognage (object-fit: contain)
- * - Synchronisation au pixel pres du canvas Three.js avec la resolution reelle de la camera
- * - Bascule fiable entre tous les capteurs (Android Camera2 / ROG Phone / PC)
+ * Gestionnaire de camera et cadrage universel pour AR.js
+ * - Override natif du moteur de redimensionnement AR.js (passage de cover à contain)
+ * - Maintien du flux camera sans aucun rognage avec bandes noires propres
+ * - Alignement 3D pixel-par-pixel rigoureux sur le marqueur Hiro
+ * - Garantit la superposition de la scène 3D devant le flux vidéo sur Android / Chrome
  */
 
 (function () {
@@ -10,33 +11,111 @@
   let currentDeviceIndex = 0;
   let isSwitching = false;
 
+  // 1. Surcharger le calcul de redimensionnement d'AR.js pour passer en mode "contain" (sans rognage)
+  if (window.THREEx && window.THREEx.ArToolkitSource) {
+    window.THREEx.ArToolkitSource.prototype.onResizeElement = function () {
+      const screenWidth = window.innerWidth;
+      const screenHeight = window.innerHeight;
+
+      let videoWidth, videoHeight;
+      if (this.domElement.nodeName === "VIDEO") {
+        videoWidth = this.domElement.videoWidth;
+        videoHeight = this.domElement.videoHeight;
+      } else if (this.domElement.nodeName === "IMG") {
+        videoWidth = this.domElement.naturalWidth;
+        videoHeight = this.domElement.naturalHeight;
+      }
+
+      if (!videoWidth || !videoHeight) return;
+
+      const videoAspect = videoWidth / videoHeight;
+      const screenAspect = screenWidth / screenHeight;
+
+      let newWidth, newHeight, newMarginLeft, newMarginTop;
+
+      if (screenAspect > videoAspect) {
+        // Écran plus large que la vidéo (ex: PC) -> bandes noires sur les côtés
+        newHeight = screenHeight;
+        newWidth = newHeight * videoAspect;
+        newMarginLeft = (screenWidth - newWidth) / 2;
+        newMarginTop = 0;
+      } else {
+        // Écran plus haut que la vidéo (ex: Mobile portrait) -> bandes noires en haut et en bas
+        newWidth = screenWidth;
+        newHeight = newWidth / videoAspect;
+        newMarginLeft = 0;
+        newMarginTop = (screenHeight - newHeight) / 2;
+      }
+
+      const wStr = Math.round(newWidth) + "px";
+      const hStr = Math.round(newHeight) + "px";
+      const mlStr = Math.round(newMarginLeft) + "px";
+      const mtStr = Math.round(newMarginTop) + "px";
+
+      this.domElement.style.position = "absolute";
+      this.domElement.style.top = "0px";
+      this.domElement.style.left = "0px";
+      this.domElement.style.width = wStr;
+      this.domElement.style.height = hStr;
+      this.domElement.style.marginLeft = mlStr;
+      this.domElement.style.marginTop = mtStr;
+      this.domElement.style.zIndex = "1";
+
+      // Synchroniser immédiatement le canvas A-Frame Three.js
+      const canvas = document.querySelector('.a-canvas');
+      if (canvas) {
+        canvas.style.position = "absolute";
+        canvas.style.top = "0px";
+        canvas.style.left = "0px";
+        canvas.style.width = wStr;
+        canvas.style.height = hStr;
+        canvas.style.marginLeft = mlStr;
+        canvas.style.marginTop = mtStr;
+        canvas.style.zIndex = "2"; // Toujours devant la vidéo
+
+        const scene = document.querySelector('a-scene');
+        if (scene && scene.renderer) {
+          scene.renderer.setSize(Math.round(newWidth), Math.round(newHeight), false);
+        }
+      }
+    };
+
+    window.THREEx.ArToolkitSource.prototype.copyElementSizeTo = function (otherElement) {
+      if (!otherElement) return;
+      otherElement.style.position = "absolute";
+      otherElement.style.top = "0px";
+      otherElement.style.left = "0px";
+      otherElement.style.width = this.domElement.style.width;
+      otherElement.style.height = this.domElement.style.height;
+      otherElement.style.marginLeft = this.domElement.style.marginLeft;
+      otherElement.style.marginTop = this.domElement.style.marginTop;
+      otherElement.style.zIndex = "2";
+    };
+  }
+
   function getElements() {
     const video = document.querySelector('#arjs-video') || document.querySelector('video');
     const canvas = document.querySelector('.a-canvas') || document.querySelector('canvas');
     return { video, canvas };
   }
 
-  // Synchronise la taille du buffer interne du canvas sur les dimensions reelles de la video
-  // pour que object-fit: contain produise un alignement 3D parfait
-  function syncCanvasBuffer() {
-    const { video, canvas } = getElements();
-    if (!video || !canvas) return;
-
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
-    if (!vw || !vh) return;
-
-    if (canvas.width !== vw || canvas.height !== vh) {
-      canvas.width = vw;
-      canvas.height = vh;
+  // Force l'application du cadrage contain
+  function applyContainFraming() {
+    const { video } = getElements();
+    if (video && video.videoWidth && video.videoHeight) {
+      const source = window.ARjs && window.ARjs.Source ? window.ARjs.Source : null;
       const scene = document.querySelector('a-scene');
-      if (scene && scene.renderer) {
-        scene.renderer.setSize(vw, vh, false);
+      const arSource = scene && scene.systems && scene.systems.arjs && scene.systems.arjs._arSession ? scene.systems.arjs._arSession.arSource : null;
+
+      if (arSource && typeof arSource.onResizeElement === 'function') {
+        arSource.onResizeElement();
+      } else if (window.THREEx && window.THREEx.ArToolkitSource) {
+        window.THREEx.ArToolkitSource.prototype.onResizeElement.call({ domElement: video });
       }
     }
   }
 
-  // Fournit le rectangle de rendu exact calcule par object-fit: contain sur l'ecran
+  // Fournit le rectangle de rendu exact pour la projection 2D
   window.getARViewport = function () {
     const { video } = getElements();
     const sw = window.innerWidth;
@@ -48,13 +127,29 @@
 
     const vw = video.videoWidth;
     const vh = video.videoHeight;
-    const scale = Math.min(sw / vw, sh / vh);
-    const rw = vw * scale;
-    const rh = vh * scale;
-    const ox = (sw - rw) / 2;
-    const oy = (sh - rh) / 2;
+    const videoAspect = vw / vh;
+    const screenAspect = sw / sh;
 
-    return { left: ox, top: oy, width: rw, height: rh };
+    let targetWidth, targetHeight, marginLeft, marginTop;
+
+    if (screenAspect > videoAspect) {
+      targetHeight = sh;
+      targetWidth = targetHeight * videoAspect;
+      marginLeft = (sw - targetWidth) / 2;
+      marginTop = 0;
+    } else {
+      targetWidth = sw;
+      targetHeight = targetWidth / videoAspect;
+      marginLeft = 0;
+      marginTop = (sh - targetHeight) / 2;
+    }
+
+    return {
+      left: Math.round(marginLeft),
+      top: Math.round(marginTop),
+      width: Math.round(targetWidth),
+      height: Math.round(targetHeight)
+    };
   };
 
   async function updateDeviceList(activeTrack) {
@@ -154,12 +249,12 @@
       await video.play();
 
       video.onloadedmetadata = function () {
-        syncCanvasBuffer();
+        applyContainFraming();
         window.dispatchEvent(new Event('resize'));
       };
 
       setTimeout(() => {
-        syncCanvasBuffer();
+        applyContainFraming();
         window.dispatchEvent(new Event('resize'));
       }, 300);
 
@@ -173,7 +268,7 @@
         });
         video.srcObject = fallbackStream;
         await video.play();
-        syncCanvasBuffer();
+        applyContainFraming();
       } catch (e2) {}
       updateButtonText();
     } finally {
@@ -187,29 +282,26 @@
 
     const checkInterval = setInterval(() => {
       const { video, canvas } = getElements();
-      if (video && video.srcObject && canvas) {
+      if (video && video.srcObject) {
         clearInterval(checkInterval);
         const track = video.srcObject.getVideoTracks()[0];
         if (track) {
           updateDeviceList(track);
         }
-        video.addEventListener('loadedmetadata', syncCanvasBuffer);
-        video.addEventListener('resize', syncCanvasBuffer);
-        syncCanvasBuffer();
+        video.addEventListener('loadedmetadata', applyContainFraming);
+        video.addEventListener('resize', applyContainFraming);
+        applyContainFraming();
       }
     }, 200);
 
     setTimeout(() => clearInterval(checkInterval), 10000);
 
     window.addEventListener('resize', () => {
-      setTimeout(syncCanvasBuffer, 50);
+      applyContainFraming();
     });
     window.addEventListener('orientationchange', () => {
-      setTimeout(syncCanvasBuffer, 300);
+      setTimeout(applyContainFraming, 250);
     });
-
-    // Boucle de maintien de synchronisation du buffer (evite que A-Frame ecrase les dimensions)
-    setInterval(syncCanvasBuffer, 500);
   }
 
   if (document.readyState === 'loading') {
@@ -220,6 +312,6 @@
 
   window.cameraSwitcher = {
     switchCamera,
-    syncCanvasBuffer
+    applyContainFraming
   };
 })();
