@@ -92,14 +92,18 @@
 
   <div class="top-controls">
     <div class="panel">
-      <strong>Exercice 3</strong> : Cliquer ou taper sur la boite pour changer couleur et rotation. | 
-      <span id="statusText">En attente d'interaction</span> | 
+      <strong>Exercice 3</strong> : Cliquer ou taper sur la boite. | 
+      <span id="statusText">Pret</span> | 
       <a href="../index.html">Sommaire</a>
     </div>
     <button id="btnSwitchCamera" class="btn" type="button">Changer de camera</button>
+    <button id="btnZoomOut" class="btn" type="button">Zoom -</button>
+    <span id="zoomLevelText" class="panel" style="padding: 6px 8px; font-weight: bold;">1.0x</span>
+    <button id="btnZoomIn" class="btn" type="button">Zoom +</button>
+    <button id="btnFitMode" class="btn" type="button">Cadrage : Remplir</button>
   </div>
 
-  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+  <a-scene embedded arjs="sourceType: webcam; sourceWidth: 1280; sourceHeight: 720; displayWidth: 1280; displayHeight: 720; debugUIEnabled: false;">
     <a-marker preset="hiro">
       <a-box 
         id="targetBox"
@@ -112,7 +116,7 @@
       </a-box>
     </a-marker>
 
-    <!-- Curseur reticule et raycaster tactile pour mobile et desktop -->
+    <!-- Curseur reticule et raycaster tactile -->
     <a-entity camera>
       <a-cursor fuse="false" color="#00ffff" raycaster="objects: .clickable"></a-cursor>
       <a-entity cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>

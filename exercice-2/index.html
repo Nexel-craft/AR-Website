@@ -54,14 +54,18 @@
 
   <div class="top-controls">
     <div class="panel">
-      <strong>Exercice 2</strong> : Viser le marqueur Hiro. Boite semi-transparente rotative. | 
+      <strong>Exercice 2</strong> : Viser Hiro (boite semi-transparente rotative). | 
       <a href="../index.html">Sommaire</a> | 
       <a href="../assets/HIRO.jpg" target="_blank">Voir Hiro</a>
     </div>
     <button id="btnSwitchCamera" class="btn" type="button">Changer de camera</button>
+    <button id="btnZoomOut" class="btn" type="button">Zoom -</button>
+    <span id="zoomLevelText" class="panel" style="padding: 6px 8px; font-weight: bold;">1.0x</span>
+    <button id="btnZoomIn" class="btn" type="button">Zoom +</button>
+    <button id="btnFitMode" class="btn" type="button">Cadrage : Remplir</button>
   </div>
 
-  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+  <a-scene embedded arjs="sourceType: webcam; sourceWidth: 1280; sourceHeight: 720; displayWidth: 1280; displayHeight: 720; debugUIEnabled: false;">
     <a-marker preset="hiro">
       <!-- Boite semi-transparente qui tourne automatiquement -->
       <a-box 

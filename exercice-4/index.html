@@ -54,17 +54,20 @@
 
   <div class="top-controls">
     <div class="panel">
-      <strong>Exercice 4</strong> : Viser le marqueur custom (pattern-custom.patt). Objet : Torus Knot 3D. | 
+      <strong>Exercice 4</strong> : Viser pattern-custom.patt (Torus Knot). | 
       <a href="../index.html">Sommaire</a> | 
-      <a href="custom-marker.png" target="_blank">Voir marqueur custom</a>
+      <a href="custom-marker.png" target="_blank">Voir pattern</a>
     </div>
     <button id="btnSwitchCamera" class="btn" type="button">Changer de camera</button>
+    <button id="btnZoomOut" class="btn" type="button">Zoom -</button>
+    <span id="zoomLevelText" class="panel" style="padding: 6px 8px; font-weight: bold;">1.0x</span>
+    <button id="btnZoomIn" class="btn" type="button">Zoom +</button>
+    <button id="btnFitMode" class="btn" type="button">Cadrage : Remplir</button>
   </div>
 
-  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
-    <!-- Marqueur personnalise de type pattern chargeant pattern-custom.patt -->
+  <a-scene embedded arjs="sourceType: webcam; sourceWidth: 1280; sourceHeight: 720; displayWidth: 1280; displayHeight: 720; debugUIEnabled: false;">
     <a-marker type="pattern" url="pattern-custom.patt">
-      <!-- Objet 3D different d'une boite : Torus Knot dore -->
+      <!-- Objet 3D Torus Knot dore -->
       <a-torus-knot 
         position="0 0.6 0" 
         radius="0.4" 

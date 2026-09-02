@@ -49,7 +49,7 @@
       text-decoration: underline;
     }
 
-    /* Message d'attente quand le marqueur n'est pas encore vu */
+    /* Message d'attente */
     #hintText {
       position: fixed;
       bottom: 20px;
@@ -62,7 +62,7 @@
       font-size: 13px;
     }
 
-    /* UI DOM Overlay : masque par defaut, affiche sur markerFound */
+    /* UI DOM Overlay */
     #uiOverlay {
       display: none;
       position: fixed;
@@ -116,20 +116,23 @@
 
   <div class="top-controls">
     <div class="panel">
-      <strong>Exercice 6</strong> : UI DOM Overlay activee sur detection du marqueur Hiro. | 
+      <strong>Exercice 6</strong> : Viser Hiro pour afficher l'UI. | 
       <a href="../index.html">Sommaire</a> | 
       <a href="../assets/HIRO.jpg" target="_blank">Voir Hiro</a>
     </div>
     <button id="btnSwitchCamera" class="btn" type="button">Changer de camera</button>
+    <button id="btnZoomOut" class="btn" type="button">Zoom -</button>
+    <span id="zoomLevelText" class="panel" style="padding: 6px 8px; font-weight: bold;">1.0x</span>
+    <button id="btnZoomIn" class="btn" type="button">Zoom +</button>
+    <button id="btnFitMode" class="btn" type="button">Cadrage : Remplir</button>
   </div>
 
   <div id="hintText">Pointez la camera vers le marqueur Hiro pour afficher l'interface.</div>
 
-  <!-- Interface utilisateur HTML (DOM Overlay) -->
   <div id="uiOverlay">
     <h2>Controle de la boite 3D</h2>
     
-    <!-- Slider de taille : 0.1 a 3.0 unites -->
+    <!-- Slider : 0.1 a 3.0 unites -->
     <div class="form-row">
       <label>
         <span>Taille de la boite :</span>
@@ -138,7 +141,7 @@
       <input type="range" id="sizeSlider" min="0.1" max="3.0" step="0.1" value="1.0">
     </div>
 
-    <!-- Palette de couleurs : Rouge, Vert, Bleu, Jaune -->
+    <!-- Palette de couleurs -->
     <div class="palette">
       <span>Couleur :</span>
       <button type="button" class="color-btn" data-color="#e74c3c" style="background: #e74c3c;">Rouge</button>
@@ -148,7 +151,7 @@
     </div>
   </div>
 
-  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+  <a-scene embedded arjs="sourceType: webcam; sourceWidth: 1280; sourceHeight: 720; displayWidth: 1280; displayHeight: 720; debugUIEnabled: false;">
     <a-marker id="hiroMarker" preset="hiro">
       <a-box 
         id="boxTarget" 
@@ -172,19 +175,16 @@
       const sizeVal = document.getElementById('sizeVal');
       const colorBtns = document.querySelectorAll('.color-btn');
 
-      // 1. Afficher l'UI uniquement quand le marqueur est detecte
       marker.addEventListener('markerFound', function () {
         uiOverlay.style.display = 'block';
         hintText.style.display = 'none';
       });
 
-      // 2. Masquer l'UI quand le marqueur est perdu
       marker.addEventListener('markerLost', function () {
         uiOverlay.style.display = 'none';
         hintText.style.display = 'block';
       });
 
-      // 3. Glisser le slider -> taille change en temps reel (0.1 -> 3.0)
       sizeSlider.addEventListener('input', function (e) {
         const val = parseFloat(e.target.value);
         box.setAttribute('scale', `${val} ${val} ${val}`);
@@ -192,7 +192,6 @@
         sizeVal.textContent = val.toFixed(1);
       });
 
-      // 4. Cliquer une couleur -> changement immediat
       colorBtns.forEach(function (btn) {
         btn.addEventListener('click', function () {
           const color = btn.dataset.color;

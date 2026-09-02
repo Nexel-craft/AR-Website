@@ -54,16 +54,20 @@
 
   <div class="top-controls">
     <div class="panel">
-      <strong>Exercice 5</strong> : Marqueur hybride (QR Code vers le site + Hiro au centre). | 
+      <strong>Exercice 5</strong> : Marqueur hybride QR Code + Hiro. | 
       <a href="../index.html">Sommaire</a> | 
-      <a href="qr-hiro-marker.png" target="_blank">Voir QR Code + Hiro</a>
+      <a href="qr-hiro-marker.png" target="_blank">Voir QR-Hiro</a>
     </div>
     <button id="btnSwitchCamera" class="btn" type="button">Changer de camera</button>
+    <button id="btnZoomOut" class="btn" type="button">Zoom -</button>
+    <span id="zoomLevelText" class="panel" style="padding: 6px 8px; font-weight: bold;">1.0x</span>
+    <button id="btnZoomIn" class="btn" type="button">Zoom +</button>
+    <button id="btnFitMode" class="btn" type="button">Cadrage : Remplir</button>
   </div>
 
-  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+  <a-scene embedded arjs="sourceType: webcam; sourceWidth: 1280; sourceHeight: 720; displayWidth: 1280; displayHeight: 720; debugUIEnabled: false;">
     <a-marker preset="hiro">
-      <!-- Boite 3D apparaissant au centre du QR Code -->
+      <!-- Boite 3D au centre du QR Code -->
       <a-box 
         position="0 0.5 0" 
         color="#8e44ad" 
