@@ -15,17 +15,23 @@
       padding: 0;
       overflow: hidden;
       font-family: Arial, sans-serif;
-      background: #000; /* Fond noir pour les barres de cadrage natif */
+      background: #000; /* Bandes noires propres sans rognage */
       user-select: none;
       -webkit-user-select: none;
     }
 
-    /* Le cadrage synchronise au pixel pres est pilote par camera-switcher.js */
+    /* Force l'affichage du flux natif sans aucun rognage */
     video#arjs-video, .a-canvas {
+      width: 100vw !important;
+      height: 100vh !important;
+      object-fit: contain !important;
+      margin: 0 !important;
+      top: 0 !important;
+      left: 0 !important;
       position: absolute !important;
     }
 
-    /* Conteneur superieur qui reste toujours 100% visible a l'ecran */
+    /* Conteneur supérieur qui reste toujours 100% visible à l'écran */
     .top-container {
       position: fixed;
       top: 8px;
@@ -85,7 +91,7 @@
       color: #0056b3;
     }
 
-    /* Figure affichant la zone de clic en noir a 20% de transparence */
+    /* Figure affichant la zone de clic en noir à 20% de transparence */
     #clickZoneBox {
       position: fixed;
       background-color: rgba(0, 0, 0, 0.2);
@@ -169,7 +175,7 @@
         box.addEventListener('click', triggerBoxInteraction);
       }
 
-      // Mise a jour en temps reel de la zone de clic alignee sur le viewport effectif
+      // Mise à jour de la zone de clic alignée sur le rectangle exact calculé par object-fit: contain
       function updateClickZone() {
         requestAnimationFrame(updateClickZone);
         if (!scene || !scene.camera) return;
@@ -185,12 +191,11 @@
         scene.object3D.updateMatrixWorld(true);
         camera.updateMatrixWorld(true);
 
-        // Recupere le rectangle video reel affiche (sans rognage)
         const vp = window.getARViewport ? window.getARViewport() : {
-          width: window.innerWidth,
-          height: window.innerHeight,
           left: 0,
-          top: 0
+          top: 0,
+          width: window.innerWidth,
+          height: window.innerHeight
         };
 
         const h = 0.55;
