@@ -14,8 +14,16 @@
       margin: 0;
       overflow: hidden;
       font-family: Arial, sans-serif;
-      user-select: none;
-      -webkit-user-select: none;
+      background: #000;
+    }
+    /* Force l'affichage du flux natif sans aucun rognage (lettrage noir si ratio different) */
+    video#arjs-video, .a-canvas {
+      width: 100vw !important;
+      height: 100vh !important;
+      object-fit: contain !important;
+      margin: 0 !important;
+      top: 0 !important;
+      left: 0 !important;
     }
     .top-controls {
       position: fixed;
@@ -27,7 +35,6 @@
       flex-wrap: wrap;
       gap: 6px;
       align-items: center;
-      touch-action: manipulation;
     }
     .panel {
       background: #ffffff;
@@ -43,7 +50,6 @@
       font-size: 13px;
       cursor: pointer;
       font-weight: bold;
-      touch-action: manipulation;
     }
     .btn:hover {
       background: #ddd;
@@ -56,35 +62,17 @@
       font-weight: bold;
       color: #0056b3;
     }
-
-    /* Figure affichant la zone de clic en noir à 20% de transparence */
-    #clickZoneBox {
-      position: fixed;
-      background-color: rgba(0, 0, 0, 0.2); /* Noir a 20% de transparence */
-      border: 2px dashed rgba(0, 0, 0, 0.6);
-      pointer-events: auto; /* Permet de cliquer/taper directement sur la zone */
-      z-index: 995;
-      display: none;
-      box-sizing: border-box;
-      cursor: pointer;
-    }
   </style>
 
   <script>
-    // Composant de rotation dynamique en boucle continue
-    AFRAME.registerComponent('dynamic-spin', {
+    // Composant de rotation en boucle continue a vitesse modulable
+    AFRAME.registerComponent('rotator', {
       schema: {
         speed: { type: 'number', default: 1.0 }
       },
-      init: function () {
-        this.currentSpeed = this.data.speed;
-      },
-      update: function () {
-        this.currentSpeed = this.data.speed;
-      },
       tick: function (time, timeDelta) {
         if (!this.el.object3D) return;
-        this.el.object3D.rotation.y += (timeDelta / 1000) * this.currentSpeed;
+        this.el.object3D.rotation.y += (timeDelta / 1000) * this.data.speed;
       }
     });
 
@@ -92,168 +80,99 @@
       const scene = document.querySelector('a-scene');
       const box = document.getElementById('targetBox');
       const statusEl = document.getElementById('statusText');
-      const clickZone = document.getElementById('clickZoneBox');
-      const colors = ['#e74c3c', '#2ecc71', '#9b59b6', '#f1c40f', '#e67e22', '#00bcd4', '#e91e63'];
+      const colors = ['#e74c3c', '#2ecc71', '#3498db', '#f1c40f', '#9b59b6', '#e67e22', '#00bcd4'];
       
       let colorIndex = 0;
       let isFast = false;
       let lastTrigger = 0;
 
-      // Déclenchement de l'interaction (changement couleur, vitesse et échelle)
-      function triggerBoxInteraction() {
+      // Déclenchement de l'interaction demandée par la consigne
+      function triggerInteraction() {
         const now = Date.now();
-        if (now - lastTrigger < 250) return; // Anti-rebond
+        if (now - lastTrigger < 250) return;
         lastTrigger = now;
 
         const target = document.getElementById('targetBox');
         if (!target) return;
 
-        // 1. Couleur
+        // 1. Changement de couleur
         colorIndex = (colorIndex + 1) % colors.length;
         const nextColor = colors[colorIndex];
         target.setAttribute('material', 'color', nextColor);
 
-        // 2. Vitesse de rotation (1x -> 6x)
+        // 2. Animation supplémentaire : tourne plus vite (1x -> 5x) et pulse d'échelle
         isFast = !isFast;
-        const newSpeed = isFast ? 6.0 : 1.0;
-        target.setAttribute('dynamic-spin', 'speed', newSpeed);
-
-        // 3. Échelle (pulse a 1.6x)
-        const targetScale = isFast ? '1.6 1.6 1.6' : '1.0 1.0 1.0';
+        target.setAttribute('rotator', 'speed', isFast ? 5.0 : 1.0);
         target.setAttribute('animation__scale', {
           property: 'scale',
-          to: targetScale,
+          to: isFast ? '1.5 1.5 1.5' : '1.0 1.0 1.0',
           dur: 300,
           easing: 'easeOutBack'
         });
 
-        // 4. Vibration mobile si supportée
-        if (navigator.vibrate) {
-          try { navigator.vibrate(50); } catch(e) {}
-        }
-
-        // 5. Statut
         if (statusEl) {
-          statusEl.textContent = `Touche ! Vitesse: ${isFast ? 'Rapide (6x)' : 'Normale (1x)'} | Couleur: ${nextColor}`;
+          statusEl.textContent = `Touche ! Vitesse: ${isFast ? 'Rapide (5x)' : 'Normale (1x)'} | Couleur: ${nextColor}`;
         }
       }
 
-      // Clic direct sur la zone noire semi-transparente
-      clickZone.addEventListener('click', triggerBoxInteraction);
-      clickZone.addEventListener('touchstart', function(e) {
-        e.preventDefault();
-        triggerBoxInteraction();
-      }, { passive: false });
-
-      // Écouteur de clic A-Frame sur l'entité boîte
+      // Écouteur de clic direct A-Frame
       if (box) {
-        box.addEventListener('click', triggerBoxInteraction);
+        box.addEventListener('click', triggerInteraction);
       }
 
-      // Calcul et affichage en temps réel de la zone de clic (noir à 20% d'opacité)
-      function updateClickZone() {
-        requestAnimationFrame(updateClickZone);
+      // Détection universelle clic (desktop) et tap (mobile)
+      function checkTouchTarget(clientX, clientY) {
         if (!scene || !scene.camera) return;
         const camera = scene.camera;
-        const marker = document.querySelector('a-marker');
         const target = document.getElementById('targetBox');
+        const marker = document.querySelector('a-marker');
+        if (!target || !target.object3D || !marker || !marker.object3D || !marker.object3D.visible) return;
 
-        if (!marker || !marker.object3D || !marker.object3D.visible || !target || !target.object3D) {
-          clickZone.style.display = 'none';
+        target.object3D.updateMatrixWorld(true);
+
+        // Projection 2D du cube pour valider le tap sur mobile et PC
+        const center = new THREE.Vector3();
+        target.object3D.getWorldPosition(center);
+        center.project(camera);
+
+        if (center.z > 1) return; // Derrière la caméra
+
+        const screenX = ((center.x + 1) / 2) * window.innerWidth;
+        const screenY = ((-center.y + 1) / 2) * window.innerHeight;
+
+        // Distance entre le point touché et le centre du cube à l'écran
+        const dist = Math.hypot(clientX - screenX, clientY - screenY);
+        
+        // Rayon tactile adapté (au moins 80px)
+        if (dist < 90) {
+          triggerInteraction();
           return;
         }
 
-        // Met à jour les matrices mondes pour la projection
-        scene.object3D.updateMatrixWorld(true);
-        camera.updateMatrixWorld(true);
+        // Raycaster 3D complémentaire
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        mouse.x = (clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
 
-        const h = 0.55;
-        const corners = [
-          new THREE.Vector3(-h, -h, -h),
-          new THREE.Vector3( h, -h, -h),
-          new THREE.Vector3(-h,  h, -h),
-          new THREE.Vector3( h,  h, -h),
-          new THREE.Vector3(-h, -h,  h),
-          new THREE.Vector3( h, -h,  h),
-          new THREE.Vector3(-h,  h,  h),
-          new THREE.Vector3( h,  h,  h)
-        ];
-
-        let minX = Infinity, maxX = -Infinity;
-        let minY = Infinity, maxY = -Infinity;
-        let inFront = false;
-
-        const w = window.innerWidth;
-        const hWin = window.innerHeight;
-
-        for (let i = 0; i < 8; i++) {
-          const v = corners[i].clone();
-          v.applyMatrix4(target.object3D.matrixWorld);
-          v.project(camera);
-
-          if (v.z < 1) inFront = true;
-
-          const sx = ((v.x + 1) / 2) * w;
-          const sy = ((-v.y + 1) / 2) * hWin;
-
-          if (sx < minX) minX = sx;
-          if (sx > maxX) maxX = sx;
-          if (sy < minY) minY = sy;
-          if (sy > maxY) maxY = sy;
+        if (raycaster.intersectObjects([target.object3D], true).length > 0) {
+          triggerInteraction();
         }
-
-        if (!inFront || maxX <= minX || maxY <= minY) {
-          clickZone.style.display = 'none';
-          return;
-        }
-
-        // Calibre la zone avec une taille minimale confortable (évite les zones minuscules sur Firefox)
-        const padding = 15;
-        let boxW = (maxX - minX) + 2 * padding;
-        let boxH = (maxY - minY) + 2 * padding;
-        let boxL = minX - padding;
-        let boxT = minY - padding;
-
-        const minTouchSize = 95;
-        if (boxW < minTouchSize) {
-          const diff = minTouchSize - boxW;
-          boxL -= diff / 2;
-          boxW = minTouchSize;
-        }
-        if (boxH < minTouchSize) {
-          const diff = minTouchSize - boxH;
-          boxT -= diff / 2;
-          boxH = minTouchSize;
-        }
-
-        clickZone.style.display = 'block';
-        clickZone.style.left = Math.round(boxL) + 'px';
-        clickZone.style.top = Math.round(boxT) + 'px';
-        clickZone.style.width = Math.round(boxW) + 'px';
-        clickZone.style.height = Math.round(boxH) + 'px';
       }
 
-      requestAnimationFrame(updateClickZone);
-
-      // Gestion des clics/taps n'importe où sur l'écran qui touchent la zone
-      function checkGlobalPointer(clientX, clientY, target) {
-        if (target && target.closest && target.closest('.top-controls')) return;
-        if (clickZone.style.display !== 'none') {
-          const rect = clickZone.getBoundingClientRect();
-          if (clientX >= rect.left && clientX <= rect.right &&
-              clientY >= rect.top && clientY <= rect.bottom) {
-            triggerBoxInteraction();
-          }
-        }
+      function handleInput(clientX, clientY, targetElem) {
+        if (targetElem && targetElem.closest && targetElem.closest('.top-controls')) return;
+        checkTouchTarget(clientX, clientY);
       }
 
       window.addEventListener('pointerdown', function (e) {
-        checkGlobalPointer(e.clientX, e.clientY, e.target);
+        handleInput(e.clientX, e.clientY, e.target);
       }, true);
 
       window.addEventListener('touchstart', function (e) {
         if (e.touches && e.touches.length > 0) {
-          checkGlobalPointer(e.touches[0].clientX, e.touches[0].clientY, e.target);
+          handleInput(e.touches[0].clientX, e.touches[0].clientY, e.target);
         }
       }, { passive: true });
     });
@@ -261,26 +180,18 @@
 </head>
 <body>
 
-  <!-- Figure matérialisant la zone de clic en noir à 20% de transparence -->
-  <div id="clickZoneBox" title="Zone de clic"></div>
-
   <div class="top-controls">
     <div class="panel">
-      <strong>Exercice 3</strong> : Taper sur le cube ou la zone de clic. | 
+      <strong>Exercice 3</strong> : Taper ou cliquer sur la boite. | 
       <span id="statusText">En attente de detection Hiro</span> | 
       <a href="../index.html">Sommaire</a>
     </div>
     <button id="btnSwitchCamera" class="btn" type="button">Changer de camera</button>
-    <button id="btnZoomOut" class="btn" type="button">Zoom -</button>
-    <span id="zoomLevelText" class="panel" style="padding: 6px 8px; font-weight: bold;">1.0x</span>
-    <button id="btnZoomIn" class="btn" type="button">Zoom +</button>
-    <button id="btnFitMode" class="btn" type="button">Cadrage : Remplir</button>
   </div>
 
-  <!-- Scene AR sans dimensions fixes forcees pour eviter le clipping du cube sur mobile -->
   <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
     <a-marker preset="hiro">
-      <!-- Boite interactive -->
+      <!-- Boite interactive de l'Exercice 2 -->
       <a-box 
         id="targetBox"
         class="clickable"
@@ -288,11 +199,11 @@
         scale="1 1 1"
         color="#e74c3c" 
         material="opacity: 0.85; transparent: true;"
-        dynamic-spin="speed: 1.0">
+        rotator="speed: 1.0">
       </a-box>
     </a-marker>
 
-    <!-- Curseur camera associe pour le raycasting de base -->
+    <!-- Curseur associe a la camera pour le raycasting de base (consigne) -->
     <a-entity camera cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
   </a-scene>
 
