@@ -1,9 +1,9 @@
 /**
  * Gestionnaire de camera, zoom et calibration pour AR.js
  * - Détection et bascule entre toutes les caméras disponibles (videoinput)
+ * - Correction du délai de libération matériel Camera2 sur Android / Chrome Mobile
  * - Gestion du Zoom + / Zoom - (matériel via WebRTC et visuel via CSS)
  * - Mode de cadrage : Remplir l'écran (cover) ou Affichage complet sans rognage (contain)
- * - Résout le problème de zoom excessif sur écrans allongés (ROG Phone, Samsung, 20:9)
  */
 
 (function () {
@@ -15,20 +15,17 @@
   let isContainMode = false;
   let zoomCapabilities = null;
 
-  // Récupère l'élément vidéo et le canvas
   function getElements() {
     const video = document.querySelector('#arjs-video') || document.querySelector('video');
     const canvas = document.querySelector('.a-canvas') || document.querySelector('canvas');
     return { video, canvas };
   }
 
-  // Applique les styles de zoom et cadrage sur la vidéo et le canvas WebGL
   function applyTransformStyles() {
     const { video, canvas } = getElements();
     if (!video) return;
 
     if (isContainMode) {
-      // Mode ajusté : la totalité du capteur caméra est visible sans rognage
       video.style.setProperty('width', '100vw', 'important');
       video.style.setProperty('height', '100vh', 'important');
       video.style.setProperty('object-fit', 'contain', 'important');
@@ -45,12 +42,10 @@
         canvas.style.setProperty('left', '0px', 'important');
       }
     } else {
-      // Mode normal : on rétablit le comportement AR.js tout en appliquant l'échelle visuelle
       video.style.removeProperty('object-fit');
       if (canvas) canvas.style.removeProperty('object-fit');
     }
 
-    // Applique le zoom visuel (CSS transform)
     const scaleStr = `scale(${currentVisualZoom})`;
     video.style.transform = scaleStr;
     video.style.transformOrigin = 'center center';
@@ -63,7 +58,6 @@
     updateZoomDisplay();
   }
 
-  // Met à jour l'affichage textuel du zoom
   function updateZoomDisplay() {
     const zoomText = document.getElementById('zoomLevelText');
     if (zoomText) {
@@ -72,7 +66,6 @@
     }
   }
 
-  // Applique le zoom matériel (WebRTC MediaTrackConstraints) si supporté
   async function applyHardwareZoom(targetZoom) {
     const { video } = getElements();
     if (!video || !video.srcObject) return false;
@@ -94,12 +87,11 @@
         return true;
       }
     } catch (e) {
-      console.warn("Hardware zoom non supporté ou refusé:", e);
+      console.warn("Hardware zoom non supporté:", e);
     }
     return false;
   }
 
-  // Énumération des caméras
   async function updateDeviceList(activeTrack) {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
@@ -129,13 +121,13 @@
     }
   }
 
-  // Bascule vers la caméra suivante
+  // Bascule fiable entre caméras pour Chrome Android et tous navigateurs
   async function switchCamera() {
     if (isSwitching) return;
     if (videoDevices.length <= 1) {
       await updateDeviceList();
       if (videoDevices.length <= 1) {
-        alert("Une seule camera est detectee sur cet appareil.");
+        alert("Une seule camera est detectee.");
         return;
       }
     }
@@ -148,36 +140,69 @@
     if (btn) btn.textContent = "Changement en cours...";
 
     try {
+      // 1. Arrêter proprement tous les flux existants
       if (video.srcObject) {
         video.srcObject.getTracks().forEach(t => t.stop());
+        video.srcObject = null;
       }
+
+      // 2. Délai indispensable sur Android pour libérer le verrou matériel Camera2
+      await new Promise(r => setTimeout(r, 250));
 
       currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;
       const targetDevice = videoDevices[currentDeviceIndex];
 
-      // Requête 16:9 idéale (1280x720) pour éviter le rognage 4:3 sur écrans longs
-      const constraints = {
-        audio: false,
-        video: {
-          deviceId: { exact: targetDevice.deviceId },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      };
+      let newStream = null;
 
-      const newStream = await navigator.mediaDevices.getUserMedia(constraints);
-      const newTrack = newStream.getVideoTracks()[0];
-      
+      // Tentative 1 : Sélection directe par deviceId sans contraindre la résolution
+      try {
+        newStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            deviceId: { exact: targetDevice.deviceId }
+          }
+        });
+      } catch (err1) {
+        console.warn("Tentative 1 echouee, tentative 2 (ideal):", err1);
+        // Tentative 2 : deviceId ideal
+        try {
+          newStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+              deviceId: targetDevice.deviceId
+            }
+          });
+        } catch (err2) {
+          console.warn("Tentative 2 echouee, tentative 3 (facingMode):", err2);
+          // Tentative 3 : alternance facingMode
+          const isFront = currentDeviceIndex === 0;
+          newStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+              facingMode: isFront ? "user" : "environment"
+            }
+          });
+        }
+      }
+
+      if (!newStream) {
+        throw new Error("Impossible d'obtenir un flux video.");
+      }
+
       video.srcObject = newStream;
       await video.play();
 
-      // Réinitialiser le zoom sur la nouvelle caméra
+      // Notifier AR.js du changement de résolution du flux
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+      }, 300);
+
       currentHardwareZoom = 1.0;
       await applyHardwareZoom(1.0);
       applyTransformStyles();
       updateButtonText();
     } catch (err) {
-      console.error("Erreur bascule camera:", err);
+      console.error("Erreur bascule camera finale:", err);
       try {
         const fallbackStream = await navigator.mediaDevices.getUserMedia({
           audio: false,
@@ -192,23 +217,19 @@
     }
   }
 
-  // Action Zoom - (dézoomer)
   async function zoomOut() {
     let hwApplied = false;
     if (zoomCapabilities && currentHardwareZoom > (zoomCapabilities.min || 1.0)) {
       const step = zoomCapabilities.step || 0.2;
       hwApplied = await applyHardwareZoom(currentHardwareZoom - step);
     }
-    // Si pas de zoom matériel ou déjà au minimum, on dézoome visuellement (jusqu'à 0.4x)
     if (!hwApplied) {
       currentVisualZoom = Math.max(0.4, Math.round((currentVisualZoom - 0.15) * 100) / 100);
     }
     applyTransformStyles();
   }
 
-  // Action Zoom + (zoomer)
   async function zoomIn() {
-    // Si on avait un dézoom visuel (< 1.0), on le remonte d'abord vers 1.0
     if (currentVisualZoom < 1.0) {
       currentVisualZoom = Math.min(1.0, Math.round((currentVisualZoom + 0.15) * 100) / 100);
       applyTransformStyles();
@@ -223,14 +244,12 @@
         hwApplied = await applyHardwareZoom(currentHardwareZoom + step);
       }
     }
-    // Si pas de zoom matériel, on zoome visuellement
     if (!hwApplied) {
       currentVisualZoom = Math.min(3.0, Math.round((currentVisualZoom + 0.2) * 100) / 100);
     }
     applyTransformStyles();
   }
 
-  // Bascule du mode de cadrage (Remplir vs Entier sans rognage)
   function toggleFitMode() {
     isContainMode = !isContainMode;
     const btn = document.getElementById('btnFitMode');
@@ -240,7 +259,6 @@
     applyTransformStyles();
   }
 
-  // Initialisation des écouteurs
   function init() {
     const btnSwitch = document.getElementById('btnSwitchCamera');
     if (btnSwitch) btnSwitch.addEventListener('click', switchCamera);
@@ -254,7 +272,6 @@
     const btnFit = document.getElementById('btnFitMode');
     if (btnFit) btnFit.addEventListener('click', toggleFitMode);
 
-    // Surveillance de l'initialisation de la vidéo par AR.js
     const checkInterval = setInterval(() => {
       const { video } = getElements();
       if (video && video.srcObject) {
