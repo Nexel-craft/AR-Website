@@ -12,21 +12,29 @@
     }
     .panel {
       position: fixed;
-      top: 10px;
-      left: 10px;
+      top: 8px;
+      left: 8px;
+      right: 8px;
       z-index: 100;
       background: #ffffff;
-      border: 1px solid #999;
-      padding: 10px 14px;
+      border: 1px solid #333;
+      padding: 8px 12px;
       font-size: 13px;
-      max-width: 320px;
+      line-height: 1.4;
+      max-width: calc(100vw - 16px);
+      box-sizing: border-box;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      white-space: normal;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
     }
     .panel h1 {
       margin: 0 0 5px 0;
       font-size: 15px;
     }
     .panel a {
-      color: #0066cc;
+      color: #0056b3;
+      text-decoration: underline;
     }
   </style>
 </head>
