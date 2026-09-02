@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Exercice 2 - AR.js et Marqueur Hiro</title>
+  
+  <!-- A-Frame 1.3.0 et AR.js 3.4.5 (version stable éprouvée pour le WebAR mobile) -->
+  <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.5/aframe/build/aframe-ar.js"></script>
+
+  <style>
+    /* Empêche les défilements et préserve le plein écran vidéo */
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    /* Interface d'aide pour l'utilisateur */
+    .ar-overlay {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      z-index: 1000;
+      pointer-events: none; /* Laisse passer les interactions vers la vidéo */
+    }
+
+    .card {
+      pointer-events: auto;
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(10px);
+      color: #ffffff;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      max-width: 420px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .card h1 {
+      margin: 0 0 6px 0;
+      font-size: 15px;
+      font-weight: 700;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .card p {
+      margin: 0 0 10px 0;
+      font-size: 12px;
+      line-height: 1.4;
+      color: #cbd5e1;
+    }
+
+    .links {
+      display: flex;
+      gap: 12px;
+      font-size: 12px;
+    }
+
+    .links a {
+      color: #38bdf8;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .links a:hover {
+      text-decoration: underline;
+    }
+
+    /* Modal d'affichage du marqueur Hiro pour test immédiat sur écran */
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      background: rgba(0, 0, 0, 0.85);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      padding: 20px;
+    }
+    .modal.active {
+      display: flex;
+    }
+    .modal img {
+      max-width: 280px;
+      width: 80%;
+      border-radius: 8px;
+      background: white;
+      padding: 10px;
+    }
+    .modal button {
+      margin-top: 15px;
+      padding: 8px 18px;
+      background: #38bdf8;
+      color: #0f172a;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Bandeau informatif en surimpression -->
+  <div class="ar-overlay">
+    <div class="card">
+      <h1>🎯 Exercice 2 : AR.js + Marqueur Hiro</h1>
+      <p>Pointez la caméra de votre smartphone vers le marqueur <strong>HIRO</strong>. Une boîte semi-transparente en rotation apparaîtra au-dessus du marqueur.</p>
+      <div class="links">
+        <a href="../index.html">← Hub</a>
+        <a href="#" onclick="document.getElementById('markerModal').classList.add('active'); return false;">Afficher le marqueur Hiro</a>
+        <a href="../assets/HIRO.jpg" target="_blank" download>Télécharger</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal pour afficher le marqueur Hiro sur l'écran si besoin -->
+  <div id="markerModal" class="modal">
+    <img src="../assets/HIRO.jpg" alt="Marqueur Hiro">
+    <p style="color: #cbd5e1; font-size: 13px; margin-top: 10px;">Pointez un autre appareil vers ce marqueur</p>
+    <button onclick="document.getElementById('markerModal').classList.remove('active')">Fermer</button>
+  </div>
+
+  <!--
+    Scène A-Frame configurée avec AR.js :
+    - embedded : intègre la scène dans le flux HTML
+    - arjs : sourceType: webcam utilise la caméra en temps réel
+    - debugUIEnabled: false supprime les overlays de logs de tracking
+  -->
+  <a-scene 
+    embedded 
+    arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;">
+    
+    <!--
+      Définition du marqueur Hiro :
+      L'entité enfant s'affiche uniquement lorsque le marqueur est détecté dans le champ de la caméra.
+    -->
+    <a-marker preset="hiro">
+      <!--
+        Boîte semi-transparente qui tourne automatiquement :
+        - material="opacity: 0.6; transparent: true" : transparence à 60%
+        - animation="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear" : rotation 360° en continue
+      -->
+      <a-box 
+        position="0 0.6 0" 
+        scale="1 1 1"
+        color="#06b6d4" 
+        material="opacity: 0.65; transparent: true; roughness: 0.2; metalness: 0.5;"
+        animation="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear">
+        
+        <!-- Petite touche esthétique : arêtes filaires lumineuses -->
+        <a-box 
+          wireframe="true" 
+          color="#ffffff" 
+          scale="1.02 1.02 1.02" 
+          position="0 0 0">
+        </a-box>
+      </a-box>
+
+      <!-- Socle circulaire lumineux pour ancrer l'objet dans l'espace AR -->
+      <a-ring 
+        rotation="-90 0 0" 
+        radius-inner="0.6" 
+        radius-outer="0.75" 
+        color="#38bdf8" 
+        material="opacity: 0.5; transparent: true">
+      </a-ring>
+    </a-marker>
+
+    <!-- Caméra AR statique qui reçoit les flux vidéo et transformations d'AR.js -->
+    <a-entity camera></a-entity>
+
+  </a-scene>
+
+</body>
+</html>

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Exercice 5 - Marqueur Hybride QR Code + Hiro</title>
+  
+  <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.5/aframe/build/aframe-ar.js"></script>
+  <!-- Bibliothèque qrcode.js pour générateur dynamique de QR code si besoin -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    .ar-overlay {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      z-index: 1000;
+      pointer-events: none;
+    }
+
+    .card {
+      pointer-events: auto;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(10px);
+      color: #ffffff;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      max-width: 460px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .card h1 {
+      margin: 0 0 6px 0;
+      font-size: 15px;
+      font-weight: 700;
+      color: #38bdf8;
+    }
+
+    .steps {
+      margin: 8px 0;
+      padding-left: 18px;
+      font-size: 12px;
+      color: #cbd5e1;
+      line-height: 1.4;
+    }
+    .steps li {
+      margin-bottom: 4px;
+    }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+
+    .links a, .links button {
+      color: #38bdf8;
+      text-decoration: none;
+      font-weight: 600;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .links a:hover, .links button:hover {
+      text-decoration: underline;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      background: rgba(0, 0, 0, 0.88);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .modal.active { display: flex; }
+    .modal-content {
+      background: #1e293b;
+      padding: 20px;
+      border-radius: 16px;
+      text-align: center;
+      max-width: 360px;
+      width: 90%;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .modal-content img {
+      max-width: 250px;
+      width: 85%;
+      border-radius: 8px;
+      background: white;
+      padding: 8px;
+      margin: 10px auto;
+      display: block;
+    }
+    .modal-content button.close-btn {
+      margin-top: 15px;
+      padding: 8px 20px;
+      background: #38bdf8;
+      color: #0f172a;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Overlay d'instructions -->
+  <div class="ar-overlay">
+    <div class="card">
+      <h1>🔲 Exercice 5 : Marqueur Hybride QR Code + Hiro</h1>
+      <ol class="steps">
+        <li><strong>Étape 1 :</strong> Scannez le QR Code avec votre smartphone pour ouvrir cette page web.</li>
+        <li><strong>Étape 2 :</strong> Pointez la caméra du navigateur vers <em>ce même QR Code</em> : la boîte 3D AR apparaîtra en son centre !</li>
+      </ol>
+      <div class="links">
+        <a href="../index.html">← Hub</a>
+        <button onclick="document.getElementById('qrModal').classList.add('active')">👁️ Afficher le QR Code + Hiro</button>
+        <a href="qr-hiro-marker.png" download>💾 Télécharger</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal visualiseur du QR Code Hybride -->
+  <div id="qrModal" class="modal">
+    <div class="modal-content">
+      <h2 style="color: #38bdf8; font-size: 16px; margin: 0 0 8px 0;">Marqueur Hybride QR Code + Hiro</h2>
+      <p style="color: #94a3b8; font-size: 11px; margin: 0 0 10px 0;">
+        Pointez ce visuel pour tester le scénario complet.
+      </p>
+      <img src="qr-hiro-marker.png" alt="Marqueur QR Code + Hiro">
+      <br>
+      <a href="qr-hiro-marker.png" download style="color: #38bdf8; font-size: 12px; text-decoration: underline;">
+        Télécharger pour imprimer ou afficher sur second écran
+      </a>
+      <br>
+      <button class="close-btn" onclick="document.getElementById('qrModal').classList.remove('active')">Fermer</button>
+    </div>
+  </div>
+
+  <!--
+    Scène AR.js :
+    Le marqueur Hiro situé au cœur du QR code est automatiquement identifié par le module de reconnaissance de formes (ARToolKit).
+  -->
+  <a-scene 
+    embedded 
+    arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix;">
+    
+    <a-marker preset="hiro">
+      
+      <!--
+        Boîte 3D au centre du QR Code :
+        - Élévation à y = 0.5
+        - Matériau violet néon avec transparence et arêtes lumineuses
+        - Double animation : rotation continue + lévitation oscillatoire
+      -->
+      <a-entity position="0 0.5 0" animation="property: position; to: 0 0.7 0; dir: alternate; loop: true; dur: 1800; easing: easeInOutSine">
+        <a-box 
+          scale="0.85 0.85 0.85" 
+          color="#8b5cf6" 
+          material="opacity: 0.8; transparent: true; roughness: 0.2; metalness: 0.6"
+          animation="property: rotation; to: 0 360 0; loop: true; dur: 4500; easing: linear">
+          <!-- Arêtes blanches -->
+          <a-box wireframe="true" color="#ffffff" scale="1.02 1.02 1.02"></a-box>
+        </a-box>
+      </a-entity>
+
+      <!-- Socle circulaire futuriste -->
+      <a-ring 
+        rotation="-90 0 0" 
+        radius-inner="0.55" 
+        radius-outer="0.65" 
+        color="#8b5cf6" 
+        material="opacity: 0.6; transparent: true">
+      </a-ring>
+
+    </a-marker>
+
+    <a-entity camera></a-entity>
+
+  </a-scene>
+
+</body>
+</html>

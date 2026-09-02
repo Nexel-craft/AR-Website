@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Exercice 1 - Scène 3D avec A-Frame</title>
+  <!-- Inclusion de la bibliothèque A-Frame -->
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <style>
+    /* Style du bandeau d'information overlay */
+    .info-overlay {
+      position: fixed;
+      top: 15px;
+      left: 15px;
+      z-index: 999;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      color: #f8fafc;
+      padding: 14px 20px;
+      border-radius: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      max-width: 380px;
+    }
+    .info-overlay h1 {
+      margin: 0 0 6px 0;
+      font-size: 16px;
+      font-weight: 700;
+      color: #38bdf8;
+    }
+    .info-overlay p {
+      margin: 0 0 10px 0;
+      font-size: 13px;
+      line-height: 1.4;
+      color: #cbd5e1;
+    }
+    .info-overlay a {
+      display: inline-block;
+      color: #38bdf8;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .info-overlay a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Overlay d'information et retour au Hub -->
+  <div class="info-overlay">
+    <h1>Exercice 1 : Scène 3D A-Frame</h1>
+    <p>3 boîtes colorées lévitent à 2 unités au-dessus du plan. La caméra est placée à Y=10 et Z=15 orientée vers l'origine.</p>
+    <a href="../index.html">← Retour au Hub principal</a>
+  </div>
+
+  <!-- Définition de la scène A-Frame -->
+  <a-scene background="color: #0f172a">
+    
+    <!-- Ciel / Ambiance lumineuse -->
+    <a-entity light="type: ambient; color: #ffffff; intensity: 0.6"></a-entity>
+    <a-entity light="type: directional; color: #ffffff; intensity: 0.8; castShadow: true" position="5 12 8"></a-entity>
+
+    <!-- Plan de base (sol) de 14x14 unités situé à y = 0 -->
+    <a-plane 
+      position="0 0 0" 
+      rotation="-90 0 0" 
+      width="14" 
+      height="14" 
+      color="#1e293b" 
+      material="roughness: 0.7; metalness: 0.1" 
+      shadow="receive: true">
+    </a-plane>
+
+    <!-- Grille visuelle au sol pour apprécier les distances -->
+    <a-grid position="0 0.01 0" static></a-grid>
+
+    <!--
+      Boîtes en lévitation à 2 unités au-dessus du plan (y = 2) :
+      Boîte 1 (Rouge/Corail) à gauche
+      Boîte 2 (Verte/Émeraude) au centre
+      Boîte 3 (Bleue/Cyan) à droite
+    -->
+    <a-box 
+      position="-3.5 2 -2" 
+      width="1.5" 
+      height="1.5" 
+      depth="1.5" 
+      color="#ef4444" 
+      material="roughness: 0.3; metalness: 0.2"
+      shadow="cast: true">
+    </a-box>
+
+    <a-box 
+      position="0 2 0" 
+      width="1.5" 
+      height="1.5" 
+      depth="1.5" 
+      color="#10b981" 
+      material="roughness: 0.3; metalness: 0.2"
+      shadow="cast: true">
+    </a-box>
+
+    <a-box 
+      position="3.5 2 2" 
+      width="1.5" 
+      height="1.5" 
+      depth="1.5" 
+      color="#3b82f6" 
+      material="roughness: 0.3; metalness: 0.2"
+      shadow="cast: true">
+    </a-box>
+
+    <!--
+      Caméra demandée :
+      - Hauteur = 10 unités (y = 10)
+      - Distance = 15 unités (z = 15)
+      - Orientée vers le centre du plan (0, 0, 0)
+      Angle de tangage (pitch) : arctan(10 / 15) = 33.69° vers le bas (rotation x = -33.69)
+      On place la caméra dans un conteneur d'entité (Camera Rig) pour fixer proprement la position et l'angle.
+    -->
+    <a-entity position="0 10 15" rotation="-33.69 0 0">
+      <a-camera look-controls="enabled: true" wasd-controls="enabled: true"></a-camera>
+    </a-entity>
+
+  </a-scene>
+
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Exercice 4 - Marqueur AR Personnalisé (.patt)</title>
+  
+  <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.5/aframe/build/aframe-ar.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    .ar-overlay {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      z-index: 1000;
+      pointer-events: none;
+    }
+
+    .card {
+      pointer-events: auto;
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(10px);
+      color: #ffffff;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      max-width: 440px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .card h1 {
+      margin: 0 0 6px 0;
+      font-size: 15px;
+      font-weight: 700;
+      color: #38bdf8;
+    }
+
+    .card p {
+      margin: 0 0 10px 0;
+      font-size: 12px;
+      line-height: 1.4;
+      color: #cbd5e1;
+    }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 12px;
+    }
+
+    .links a {
+      color: #38bdf8;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .links a:hover {
+      text-decoration: underline;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      background: rgba(0, 0, 0, 0.85);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      padding: 20px;
+    }
+    .modal.active { display: flex; }
+    .modal img {
+      max-width: 260px;
+      width: 80%;
+      border-radius: 8px;
+      background: white;
+      padding: 10px;
+    }
+    .modal button {
+      margin-top: 15px;
+      padding: 8px 18px;
+      background: #38bdf8;
+      color: #0f172a;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Overlay d'aide utilisateur -->
+  <div class="ar-overlay">
+    <div class="card">
+      <h1>⭐ Exercice 4 : Marqueur Personnalisé (.patt)</h1>
+      <p>Cette scène utilise un motif de marqueur personnalisé (fichier <code>pattern-custom.patt</code>) qui fait apparaître un <strong>Nœud Torique 3D doré</strong> (Torus Knot) en rotation perpétuelle.</p>
+      <div class="links">
+        <a href="../index.html">← Hub</a>
+        <a href="#" onclick="document.getElementById('customMarkerModal').classList.add('active'); return false;">👁️ Voir le Marqueur Custom</a>
+        <a href="custom-marker.png" download>💾 Télécharger l'image</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal visualiseur du marqueur personnalisé -->
+  <div id="customMarkerModal" class="modal">
+    <img src="custom-marker.png" alt="Marqueur personnalisé Nexel">
+    <p style="color: #cbd5e1; font-size: 13px; margin-top: 10px; text-align: center;">
+      Pointez votre smartphone vers cette image pour afficher l'objet 3D
+    </p>
+    <button onclick="document.getElementById('customMarkerModal').classList.remove('active')">Fermer</button>
+  </div>
+
+  <!-- Scène AR avec détection du marqueur personnalisé -->
+  <a-scene 
+    embedded 
+    arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix;">
+    
+    <!--
+      Intégration du marqueur personnalisé :
+      - type="pattern" : indique qu'on charge un fichier de motif .patt
+      - url="pattern-custom.patt" : chemin relatif vers le fichier de pattern ARToolKit
+    -->
+    <a-marker type="pattern" url="pattern-custom.patt">
+      
+      <!--
+        Objet 3D distinct d'une boîte :
+        Un Nœud Torique doré (Torus Knot) aux reflets métalliques avec double rotation
+      -->
+      <a-entity position="0 0.8 0">
+        
+        <!-- Nœud torique principal -->
+        <a-torus-knot 
+          radius="0.45" 
+          radius-tubular="0.08" 
+          p="2" 
+          q="3" 
+          color="#f59e0b" 
+          material="roughness: 0.15; metalness: 0.9;"
+          animation="property: rotation; to: 360 360 0; loop: true; dur: 5000; easing: linear">
+        </a-torus-knot>
+
+        <!-- Sphère centrale lumineuse -->
+        <a-sphere 
+          radius="0.18" 
+          color="#38bdf8" 
+          material="emissive: #38bdf8; emissiveIntensity: 0.6; roughness: 0.2">
+        </a-sphere>
+
+        <!-- Anneau orbital incliné -->
+        <a-ring 
+          radius-inner="0.75" 
+          radius-outer="0.8" 
+          color="#ec4899" 
+          rotation="45 0 45" 
+          material="side: double; opacity: 0.7"
+          animation="property: rotation; to: 45 360 45; loop: true; dur: 4000; easing: linear">
+        </a-ring>
+
+      </a-entity>
+
+      <!-- Socle circulaire holographique -->
+      <a-circle 
+        rotation="-90 0 0" 
+        radius="0.7" 
+        color="#1e293b" 
+        material="opacity: 0.8">
+      </a-circle>
+      <a-ring 
+        rotation="-90 0 0" 
+        radius-inner="0.68" 
+        radius-outer="0.72" 
+        color="#f59e0b">
+      </a-ring>
+
+    </a-marker>
+
+    <!-- Caméra AR -->
+    <a-entity camera></a-entity>
+
+  </a-scene>
+
+</body>
+</html>
