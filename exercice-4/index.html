@@ -19,12 +19,6 @@
     }
 
     video#arjs-video, .a-canvas {
-      width: 100vw !important;
-      height: 100vh !important;
-      object-fit: contain !important;
-      margin: 0 !important;
-      top: 0 !important;
-      left: 0 !important;
       position: absolute !important;
     }
 
@@ -99,7 +93,6 @@
 
   <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
     <a-marker type="pattern" url="pattern-custom.patt">
-      <!-- Objet 3D Torus Knot dore -->
       <a-torus-knot 
         position="0 0.6 0" 
         radius="0.4" 

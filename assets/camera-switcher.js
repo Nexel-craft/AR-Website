@@ -1,8 +1,8 @@
 /**
- * Gestionnaire de camera pour AR.js
- * - Detection et bascule fiable entre toutes les cameras disponibles
- * - Support multi-capteurs Android (ROG Phone, Samsung, Pixel, etc.)
- * - Force l'affichage du flux natif sans rognage (object-fit: contain)
+ * Gestionnaire de camera et calibration de cadrage pour AR.js
+ * - Detection et bascule fiable entre toutes les cameras (multi-capteurs Android)
+ * - Calibrage haute resolution : limite l'echelle a 1080p pour eviter l'explosion d'echelle (flux 4k/8k natif)
+ * - Cadrage natif sans aucun rognage (contain) avec alignement 3D parfait pixel-par-pixel
  */
 
 (function () {
@@ -16,28 +16,106 @@
     return { video, canvas };
   }
 
-  // Force le flux et le canvas à respecter les bords sans rognage
+  // Calcule et applique le cadrage complet (contain) sans rognage tout en conservant l'alignement 3D
   function enforceNativeFit() {
     const { video, canvas } = getElements();
-    if (video) {
-      video.style.setProperty('width', '100vw', 'important');
-      video.style.setProperty('height', '100vh', 'important');
-      video.style.setProperty('object-fit', 'contain', 'important');
-      video.style.setProperty('margin', '0px', 'important');
-      video.style.setProperty('top', '0px', 'important');
-      video.style.setProperty('left', '0px', 'important');
-      video.style.setProperty('position', 'absolute', 'important');
+    if (!video) return;
+
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh) {
+      setTimeout(enforceNativeFit, 100);
+      return;
     }
+
+    const sw = window.innerWidth;
+    const sh = window.innerHeight;
+
+    const videoAspect = vw / vh;
+    const screenAspect = sw / sh;
+
+    let targetWidth, targetHeight, marginLeft, marginTop;
+
+    if (screenAspect > videoAspect) {
+      // Ecran plus large que la video (ex: PC 16:9 ou ultrawide) -> barres noires laterales
+      targetHeight = sh;
+      targetWidth = targetHeight * videoAspect;
+      marginLeft = (sw - targetWidth) / 2;
+      marginTop = 0;
+    } else {
+      // Ecran plus haut que la video (ex: mobile portrait 20:9) -> barres noires haut/bas
+      targetWidth = sw;
+      targetHeight = targetWidth / videoAspect;
+      marginLeft = 0;
+      marginTop = (sh - targetHeight) / 2;
+    }
+
+    const wStr = Math.round(targetWidth) + 'px';
+    const hStr = Math.round(targetHeight) + 'px';
+    const mlStr = Math.round(marginLeft) + 'px';
+    const mtStr = Math.round(marginTop) + 'px';
+
+    // Application stricte et identique a la video et au canvas Three.js
+    video.style.setProperty('width', wStr, 'important');
+    video.style.setProperty('height', hStr, 'important');
+    video.style.setProperty('margin-left', mlStr, 'important');
+    video.style.setProperty('margin-top', mtStr, 'important');
+    video.style.setProperty('top', '0px', 'important');
+    video.style.setProperty('left', '0px', 'important');
+    video.style.setProperty('position', 'absolute', 'important');
+    video.style.removeProperty('object-fit');
+
     if (canvas) {
-      canvas.style.setProperty('width', '100vw', 'important');
-      canvas.style.setProperty('height', '100vh', 'important');
-      canvas.style.setProperty('object-fit', 'contain', 'important');
-      canvas.style.setProperty('margin', '0px', 'important');
+      canvas.style.setProperty('width', wStr, 'important');
+      canvas.style.setProperty('height', hStr, 'important');
+      canvas.style.setProperty('margin-left', mlStr, 'important');
+      canvas.style.setProperty('margin-top', mtStr, 'important');
       canvas.style.setProperty('top', '0px', 'important');
       canvas.style.setProperty('left', '0px', 'important');
       canvas.style.setProperty('position', 'absolute', 'important');
+      canvas.style.removeProperty('object-fit');
+    }
+
+    // Aligner le buffer de rendu Three.js sur le ratio de la video
+    const scene = document.querySelector('a-scene');
+    if (scene && scene.renderer) {
+      scene.renderer.setSize(Math.round(targetWidth), Math.round(targetHeight), false);
     }
   }
+
+  // Fournit les coordonnees du rectangle video pour la projection 2D (ex: zone de clic)
+  window.getARViewport = function() {
+    const { video } = getElements();
+    if (!video || !video.videoWidth) {
+      return { width: window.innerWidth, height: window.innerHeight, left: 0, top: 0 };
+    }
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    const sw = window.innerWidth;
+    const sh = window.innerHeight;
+    const videoAspect = vw / vh;
+    const screenAspect = sw / sh;
+
+    if (screenAspect > videoAspect) {
+      const targetHeight = sh;
+      const targetWidth = targetHeight * videoAspect;
+      return {
+        width: targetWidth,
+        height: targetHeight,
+        left: (sw - targetWidth) / 2,
+        top: 0
+      };
+    } else {
+      const targetWidth = sw;
+      const targetHeight = targetWidth / videoAspect;
+      return {
+        width: targetWidth,
+        height: targetHeight,
+        left: 0,
+        top: (sh - targetHeight) / 2
+      };
+    }
+  };
 
   async function updateDeviceList(activeTrack) {
     try {
@@ -68,7 +146,7 @@
     }
   }
 
-  // Bascule vers la caméra suivante avec libération propre Camera2 sur Android
+  // Bascule camera avec contraintes calibrees a 1080p max (evite le flux 4k/8k non-calibre sur ROG Phone)
   async function switchCamera() {
     if (isSwitching) return;
     if (videoDevices.length <= 1) {
@@ -87,13 +165,11 @@
     if (btn) btn.textContent = "Changement en cours...";
 
     try {
-      // 1. Arret complet des flux existants
       if (video.srcObject) {
         video.srcObject.getTracks().forEach(t => t.stop());
         video.srcObject = null;
       }
 
-      // 2. Delai de 250ms pour liberer le materiel sur Android
       await new Promise(r => setTimeout(r, 250));
 
       currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;
@@ -101,25 +177,32 @@
 
       let newStream = null;
 
-      // Tentative 1 : deviceId exact sans forcer de ratio rigide
+      // Négocier une résolution standard HD/FHD (1280x720 ideal, max 1920x1080)
+      const standardConstraints = {
+        width: { ideal: 1280, max: 1920 },
+        height: { ideal: 720, max: 1080 }
+      };
+
       try {
         newStream = await navigator.mediaDevices.getUserMedia({
           audio: false,
           video: {
-            deviceId: { exact: targetDevice.deviceId }
+            deviceId: { exact: targetDevice.deviceId },
+            ...standardConstraints
           }
         });
       } catch (err1) {
-        console.warn("Tentative 1 echouee, tentative 2 (ideal):", err1);
+        console.warn("Tentative 1 echouee, tentative 2 sans exact:", err1);
         try {
           newStream = await navigator.mediaDevices.getUserMedia({
             audio: false,
             video: {
-              deviceId: targetDevice.deviceId
+              deviceId: targetDevice.deviceId,
+              ...standardConstraints
             }
           });
         } catch (err2) {
-          console.warn("Tentative 2 echouee, tentative 3 (facingMode):", err2);
+          console.warn("Tentative 2 echouee, tentative 3 basique:", err2);
           const isFront = currentDeviceIndex === 0;
           newStream = await navigator.mediaDevices.getUserMedia({
             audio: false,
@@ -135,10 +218,15 @@
       video.srcObject = newStream;
       await video.play();
 
+      video.onloadedmetadata = function () {
+        enforceNativeFit();
+        window.dispatchEvent(new Event('resize'));
+      };
+
       setTimeout(() => {
         enforceNativeFit();
         window.dispatchEvent(new Event('resize'));
-      }, 200);
+      }, 300);
 
       updateButtonText();
     } catch (err) {
@@ -146,7 +234,7 @@
       try {
         const fallbackStream = await navigator.mediaDevices.getUserMedia({
           audio: false,
-          video: { facingMode: 'environment' }
+          video: { facingMode: 'environment', width: { ideal: 1280, max: 1920 } }
         });
         video.srcObject = fallbackStream;
         await video.play();
@@ -162,7 +250,6 @@
     const btnSwitch = document.getElementById('btnSwitchCamera');
     if (btnSwitch) btnSwitch.addEventListener('click', switchCamera);
 
-    // Observer l'arrivee du flux et forcer le cadrage contain
     const checkInterval = setInterval(() => {
       const { video } = getElements();
       if (video && video.srcObject) {
@@ -171,13 +258,15 @@
         if (track) {
           updateDeviceList(track);
         }
+        video.addEventListener('loadedmetadata', enforceNativeFit);
         enforceNativeFit();
       }
-    }, 300);
+    }, 250);
 
-    setTimeout(() => clearInterval(checkInterval), 12000);
+    setTimeout(() => clearInterval(checkInterval), 10000);
 
     window.addEventListener('resize', enforceNativeFit);
+    window.addEventListener('orientationchange', () => setTimeout(enforceNativeFit, 300));
   }
 
   if (document.readyState === 'loading') {

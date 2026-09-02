@@ -15,23 +15,17 @@
       padding: 0;
       overflow: hidden;
       font-family: Arial, sans-serif;
-      background: #000; /* Bandes noires propres si le ratio differe */
+      background: #000; /* Fond noir pour les barres de cadrage natif */
       user-select: none;
       -webkit-user-select: none;
     }
 
-    /* Force l'affichage du flux natif sans aucun rognage */
+    /* Le cadrage synchronise au pixel pres est pilote par camera-switcher.js */
     video#arjs-video, .a-canvas {
-      width: 100vw !important;
-      height: 100vh !important;
-      object-fit: contain !important;
-      margin: 0 !important;
-      top: 0 !important;
-      left: 0 !important;
       position: absolute !important;
     }
 
-    /* Conteneur supérieur qui reste toujours 100% visible à l'écran */
+    /* Conteneur superieur qui reste toujours 100% visible a l'ecran */
     .top-container {
       position: fixed;
       top: 8px;
@@ -91,10 +85,10 @@
       color: #0056b3;
     }
 
-    /* Figure affichant la zone de clic en noir à transparence */
+    /* Figure affichant la zone de clic en noir a 20% de transparence */
     #clickZoneBox {
       position: fixed;
-      background-color: rgba(0, 0, 0, 0.1);
+      background-color: rgba(0, 0, 0, 0.2);
       border: 2px dashed rgba(0, 0, 0, 0.6);
       pointer-events: auto;
       z-index: 995;
@@ -175,6 +169,7 @@
         box.addEventListener('click', triggerBoxInteraction);
       }
 
+      // Mise a jour en temps reel de la zone de clic alignee sur le viewport effectif
       function updateClickZone() {
         requestAnimationFrame(updateClickZone);
         if (!scene || !scene.camera) return;
@@ -189,6 +184,14 @@
 
         scene.object3D.updateMatrixWorld(true);
         camera.updateMatrixWorld(true);
+
+        // Recupere le rectangle video reel affiche (sans rognage)
+        const vp = window.getARViewport ? window.getARViewport() : {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          left: 0,
+          top: 0
+        };
 
         const h = 0.55;
         const corners = [
@@ -206,9 +209,6 @@
         let minY = Infinity, maxY = -Infinity;
         let inFront = false;
 
-        const w = window.innerWidth;
-        const hWin = window.innerHeight;
-
         for (let i = 0; i < 8; i++) {
           const v = corners[i].clone();
           v.applyMatrix4(target.object3D.matrixWorld);
@@ -216,8 +216,8 @@
 
           if (v.z < 1) inFront = true;
 
-          const sx = ((v.x + 1) / 2) * w;
-          const sy = ((-v.y + 1) / 2) * hWin;
+          const sx = vp.left + ((v.x + 1) / 2) * vp.width;
+          const sy = vp.top + ((-v.y + 1) / 2) * vp.height;
 
           if (sx < minX) minX = sx;
           if (sx > maxX) maxX = sx;
@@ -230,23 +230,11 @@
           return;
         }
 
-        const padding = 15;
+        const padding = 10;
         let boxW = (maxX - minX) + 2 * padding;
         let boxH = (maxY - minY) + 2 * padding;
         let boxL = minX - padding;
         let boxT = minY - padding;
-
-        const minTouchSize = 95;
-        if (boxW < minTouchSize) {
-          const diff = minTouchSize - boxW;
-          boxL -= diff / 2;
-          boxW = minTouchSize;
-        }
-        if (boxH < minTouchSize) {
-          const diff = minTouchSize - boxH;
-          boxT -= diff / 2;
-          boxH = minTouchSize;
-        }
 
         clickZone.style.display = 'block';
         clickZone.style.left = Math.round(boxL) + 'px';
@@ -282,10 +270,10 @@
 </head>
 <body>
 
-  <!-- Figure matérialisant la zone de clic en noir à transparence -->
+  <!-- Figure matérialisant la zone de clic en noir à 20% de transparence -->
   <div id="clickZoneBox" title="Zone de clic"></div>
 
-  <!-- Conteneur banniere et bouton camera place dessous -->
+  <!-- Conteneur banniere et bouton camera sous la banniere -->
   <div class="top-container">
     <div class="panel">
       <strong>Exercice 3</strong> : Taper sur le cube ou la zone de clic. | 
