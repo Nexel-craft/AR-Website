@@ -14,7 +14,11 @@
       margin: 0;
       overflow: hidden;
       font-family: Arial, sans-serif;
-      touch-action: none; /* Empeche les gestes de defilement mobile d'interferer avec les taps */
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .a-canvas {
+      touch-action: none !important;
     }
     .top-controls {
       position: fixed;
@@ -26,7 +30,7 @@
       flex-wrap: wrap;
       gap: 6px;
       align-items: center;
-      touch-action: auto;
+      touch-action: manipulation;
     }
     .panel {
       background: #ffffff;
@@ -42,6 +46,7 @@
       font-size: 13px;
       cursor: pointer;
       font-weight: bold;
+      touch-action: manipulation;
     }
     .btn:hover {
       background: #ddd;
@@ -57,101 +62,189 @@
   </style>
 
   <script>
-    // Composant de rotation continue parametree en vitesse
+    // Composant de rotation dynamique dont la vitesse est modifiable en temps reel
     AFRAME.registerComponent('dynamic-spin', {
       schema: {
-        speed: { type: 'number', default: 1.2 }
+        speed: { type: 'number', default: 1.0 }
+      },
+      init: function () {
+        this.currentSpeed = this.data.speed;
+      },
+      update: function () {
+        this.currentSpeed = this.data.speed;
       },
       tick: function (time, timeDelta) {
         if (!this.el.object3D) return;
-        this.el.object3D.rotation.y += (timeDelta / 1000) * this.data.speed;
+        this.el.object3D.rotation.y += (timeDelta / 1000) * this.currentSpeed;
       }
     });
 
     document.addEventListener('DOMContentLoaded', function () {
-      const box = document.getElementById('targetBox');
+      const scene = document.querySelector('a-scene');
       const statusEl = document.getElementById('statusText');
-      const colors = ['#e74c3c', '#2ecc71', '#3498db', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c'];
+      const colors = ['#e74c3c', '#2ecc71', '#9b59b6', '#f1c40f', '#e67e22', '#00bcd4', '#e91e63'];
       
-      let colorIndex = 2; // Bleu par defaut
+      let colorIndex = 0;
       let isFast = false;
       let lastTrigger = 0;
 
-      // Fonction principale declenchee au clic ou au tap sur le cube
+      // Fonction d'interaction déclenchée lorsque le cube est touché ou cliqué
       function triggerBoxInteraction() {
         const now = Date.now();
-        if (now - lastTrigger < 250) return; // Evite les doublons clic/tactile
+        if (now - lastTrigger < 300) return; // Anti-rebond
         lastTrigger = now;
+
+        const box = document.getElementById('targetBox');
+        if (!box) return;
 
         // 1. Changement de couleur
         colorIndex = (colorIndex + 1) % colors.length;
         const nextColor = colors[colorIndex];
         box.setAttribute('material', 'color', nextColor);
 
-        // 2. Changement de vitesse de rotation et d'echelle
+        // 2. Changement de vitesse de rotation (normale 1x -> rapide 6x)
         isFast = !isFast;
-        const targetSpeed = isFast ? 5.0 : 1.2;
-        box.setAttribute('dynamic-spin', 'speed', targetSpeed);
+        const newSpeed = isFast ? 6.0 : 1.0;
+        box.setAttribute('dynamic-spin', 'speed', newSpeed);
 
+        // 3. Changement d'echelle (pulse a 1.6x)
+        const targetScale = isFast ? '1.6 1.6 1.6' : '1.0 1.0 1.0';
         box.setAttribute('animation__scale', {
           property: 'scale',
-          to: isFast ? '1.5 1.5 1.5' : '1.0 1.0 1.0',
+          to: targetScale,
           dur: 300,
           easing: 'easeOutBack'
         });
 
-        // 3. Vibration tactile sur mobile si supportee
+        // 4. Vibration tactile mobile si supportée
         if (navigator.vibrate) {
           try { navigator.vibrate(50); } catch(e) {}
         }
 
-        // 4. Mise a jour textuelle
+        // 5. Mise à jour de l'affichage
         if (statusEl) {
-          statusEl.textContent = `Touche ! Vitesse: ${isFast ? 'Rapide (5x)' : 'Normale (1x)'} | Couleur: ${nextColor}`;
+          statusEl.textContent = `Touche ! Vitesse: ${isFast ? 'Rapide (6x)' : 'Normale (1x)'} | Taille: ${isFast ? '1.6x' : '1.0x'} | Couleur: ${nextColor}`;
         }
       }
 
-      // Ecouteur classique A-Frame click
-      box.addEventListener('click', triggerBoxInteraction);
+      // Detection 1 : Événement click classique A-Frame
+      const boxEl = document.getElementById('targetBox');
+      if (boxEl) {
+        boxEl.addEventListener('click', triggerBoxInteraction);
+      }
 
-      // Raycaster direct Three.js pour garantir la detection tactile immediate sur mobile
-      const raycaster = new THREE.Raycaster();
-      const mouseVec = new THREE.Vector2();
+      // Détection géométrique 2D/3D hybride (résout les problèmes de cadrage/offset sur mobile et Firefox)
+      function isClickOnBox(clientX, clientY) {
+        if (!scene || !scene.camera) return false;
+        const camera = scene.camera;
 
-      function handlePointerCheck(clientX, clientY) {
-        const scene = document.querySelector('a-scene');
-        if (!scene || !scene.camera) return;
-        const canvas = scene.canvas;
-        if (!canvas) return;
+        const box = document.getElementById('targetBox');
+        if (!box || !box.object3D) return false;
 
-        const rect = canvas.getBoundingClientRect();
-        mouseVec.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-        mouseVec.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+        const marker = document.querySelector('a-marker');
+        // Ne réagit que si le marqueur est actuellement visible
+        if (marker && marker.object3D && !marker.object3D.visible) return false;
 
-        raycaster.setFromCamera(mouseVec, scene.camera);
+        box.object3D.updateMatrixWorld(true);
 
-        if (!box.object3D) return;
+        // A. Verification par projection 2D des 8 sommets du cube sur l'écran
+        const half = 0.55; // Demi-dimension avec marge
+        const corners = [
+          new THREE.Vector3(-half, -half, -half),
+          new THREE.Vector3( half, -half, -half),
+          new THREE.Vector3(-half,  half, -half),
+          new THREE.Vector3( half,  half, -half),
+          new THREE.Vector3(-half, -half,  half),
+          new THREE.Vector3( half, -half,  half),
+          new THREE.Vector3(-half,  half,  half),
+          new THREE.Vector3( half,  half,  half),
+        ];
 
-        // Verification de l'intersection avec la boite
-        const intersects = raycaster.intersectObjects([box.object3D], true);
-        if (intersects.length > 0) {
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+        let anyVisible = false;
+
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+
+        for (let i = 0; i < corners.length; i++) {
+          const pt = corners[i].clone();
+          box.object3D.localToWorld(pt);
+          pt.project(camera);
+
+          if (pt.z < 1) { // Devant la caméra
+            anyVisible = true;
+          }
+
+          const sx = ((pt.x + 1) / 2) * w;
+          const sy = ((-pt.y + 1) / 2) * h;
+
+          if (sx < minX) minX = sx;
+          if (sx > maxX) maxX = sx;
+          if (sy < minY) minY = sy;
+          if (sy > maxY) maxY = sy;
+        }
+
+        if (anyVisible) {
+          const touchPadding = 25; // Tolérance pour la surface du doigt sur smartphone
+          if (clientX >= (minX - touchPadding) && clientX <= (maxX + touchPadding) &&
+              clientY >= (minY - touchPadding) && clientY <= (maxY + touchPadding)) {
+            return true;
+          }
+        }
+
+        // B. Verification complementaire par Raycaster 3D classique
+        const raycaster = new THREE.Raycaster();
+        const mouseVec = new THREE.Vector2();
+        
+        // Coordonnees normalisees par rapport a la fenetre
+        mouseVec.x = (clientX / w) * 2 - 1;
+        mouseVec.y = -(clientY / h) * 2 + 1;
+        raycaster.setFromCamera(mouseVec, camera);
+        if (raycaster.intersectObjects([box.object3D], true).length > 0) return true;
+
+        // Coordonnees normalisees par rapport au canvas
+        if (scene.canvas) {
+          const rect = scene.canvas.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) {
+            mouseVec.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouseVec.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouseVec, camera);
+            if (raycaster.intersectObjects([box.object3D], true).length > 0) return true;
+          }
+        }
+
+        return false;
+      }
+
+      function handleInputEvent(clientX, clientY, target) {
+        // Ignorer les clics sur les boutons de controles supérieurs
+        if (target && target.closest && target.closest('.top-controls')) return;
+        if (isClickOnBox(clientX, clientY)) {
           triggerBoxInteraction();
         }
       }
 
-      // Detection souris desktop
+      // 1. Écouteur Pointer (Desktop souris + certains mobiles)
       window.addEventListener('pointerdown', function (e) {
-        if (e.target.closest('.top-controls')) return;
-        handlePointerCheck(e.clientX, e.clientY);
-      });
+        handleInputEvent(e.clientX, e.clientY, e.target);
+      }, true);
 
-      // Detection tactile mobile (toucher du doigt sur l'ecran)
+      // 2. Écouteur Tactile direct (Smartphones Android, iOS, Firefox Mobile, Samsung Internet)
       window.addEventListener('touchstart', function (e) {
-        if (e.target.closest('.top-controls')) return;
-        if (e.touches && e.touches[0]) {
-          handlePointerCheck(e.touches[0].clientX, e.touches[0].clientY);
+        if (e.touches && e.touches.length > 0) {
+          const touch = e.touches[0];
+          handleInputEvent(touch.clientX, touch.clientY, e.target);
         }
-      }, { passive: true });
+      }, { passive: true, capture: true });
+
+      // 3. Fallback sur touchend
+      window.addEventListener('touchend', function (e) {
+        if (e.changedTouches && e.changedTouches.length > 0) {
+          const touch = e.changedTouches[0];
+          handleInputEvent(touch.clientX, touch.clientY, e.target);
+        }
+      }, { passive: true, capture: true });
     });
   </script>
 </head>
@@ -159,7 +252,7 @@
 
   <div class="top-controls">
     <div class="panel">
-      <strong>Exercice 3</strong> : Taper ou cliquer directement sur la boite. | 
+      <strong>Exercice 3</strong> : Taper ou cliquer sur la boite. | 
       <span id="statusText">En attente de touche sur le cube</span> | 
       <a href="../index.html">Sommaire</a>
     </div>
@@ -172,19 +265,19 @@
 
   <a-scene embedded arjs="sourceType: webcam; sourceWidth: 1920; sourceHeight: 1080; debugUIEnabled: false;">
     <a-marker preset="hiro">
-      <!-- Boite interactive avec composant de rotation dynamique -->
+      <!-- Boite interactive -->
       <a-box 
         id="targetBox"
         class="clickable"
         position="0 0.5 0" 
         scale="1 1 1"
-        color="#3498db" 
+        color="#e74c3c" 
         material="opacity: 0.85; transparent: true;"
-        dynamic-spin="speed: 1.2">
+        dynamic-spin="speed: 1.0">
       </a-box>
     </a-marker>
 
-    <!-- Curseur associe a la camera pour la souris et le tactile -->
+    <!-- Curseur associe a la camera pour le raycasting de base -->
     <a-entity camera cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
   </a-scene>
 
